@@ -55,16 +55,7 @@ $ npx ccmanager
 
 ### CCMANAGER_CLAUDE_ARGS
 
-⚠️ **Deprecated in v0.1.9**: `CCMANAGER_CLAUDE_ARGS` is no longer supported for Claude Code. Please use the [Command Configuration](#command-configuration) feature instead.
-
-```bash
-# Start Claude Code with specific arguments for all sessions
-export CCMANAGER_CLAUDE_ARGS="--resume"
-npx ccmanager
-
-# Or set it inline
-CCMANAGER_CLAUDE_ARGS="--resume" npx ccmanager
-```
+⚠️ **Deprecated in v0.1.9**: `CCMANAGER_CLAUDE_ARGS` is no longer supported. Please use the [Command Configuration](#command-configuration) feature instead.
 
 ### CCMANAGER_CODEX_ARGS
 
