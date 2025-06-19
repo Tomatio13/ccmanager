@@ -5,6 +5,8 @@ export type Terminal = InstanceType<typeof pkg.Terminal>;
 
 export type SessionState = 'idle' | 'busy' | 'waiting_input';
 
+export type CommandType = 'claude' | 'codex';
+
 export interface Worktree {
 	path: string;
 	branch: string;
@@ -25,11 +27,12 @@ export interface Session {
 	stateCheckInterval?: NodeJS.Timeout; // Interval for checking terminal state
 	isPrimaryCommand?: boolean; // Track if process was started with main command args
 	commandConfig?: CommandConfig; // Store command config for fallback
+	commandType: CommandType; // Type of command being executed (claude or codex)
 }
 
 export interface SessionManager {
 	sessions: Map<string, Session>;
-	createSession(worktreePath: string): Promise<Session>;
+	createSession(worktreePath: string, commandType?: CommandType): Promise<Session>;
 	getSession(worktreePath: string): Session | undefined;
 	destroySession(worktreePath: string): void;
 	getAllSessions(): Session[];

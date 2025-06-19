@@ -3,6 +3,7 @@ import {
 	Session,
 	SessionManager as ISessionManager,
 	SessionState,
+	CommandType,
 } from '../types/index.js';
 import {EventEmitter} from 'events';
 import pkg from '@xterm/headless';
@@ -75,7 +76,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 		this.sessions = new Map();
 	}
 
-	async createSession(worktreePath: string): Promise<Session> {
+	async createSession(worktreePath: string, commandType: CommandType = 'claude'): Promise<Session> {
 		// Check if session already exists
 		const existing = this.sessions.get(worktreePath);
 		if (existing) {
@@ -86,10 +87,22 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			.toString(36)
 			.substr(2, 9)}`;
 
-		// Get command configuration
-		const commandConfig = configurationManager.getCommandConfig();
-		const command = commandConfig.command || 'claude';
-		const args = commandConfig.args || [];
+		// Determine command and arguments based on commandType
+		let command: string;
+		let args: string[];
+
+		if (commandType === 'codex') {
+			command = 'codex';
+			// Get codex-specific args from environment or use command config fallback
+			args = process.env['CCMANAGER_CODEX_ARGS']
+				? process.env['CCMANAGER_CODEX_ARGS'].split(' ')
+				: [];
+		} else {
+			// Use command configuration for Claude (maintains backward compatibility)
+			const commandConfig = configurationManager.getCommandConfig();
+			command = commandConfig.command || 'claude';
+			args = commandConfig.args || [];
+		}
 
 		// Spawn the process with fallback support
 		const ptyProcess = await this.spawn(command, args, worktreePath);
@@ -100,6 +113,11 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			rows: process.stdout.rows || 24,
 			allowProposedApi: true,
 		});
+
+		// Store command config for fallback (only for Claude)
+		const commandConfig = commandType === 'claude' 
+			? configurationManager.getCommandConfig()
+			: undefined;
 
 		const session: Session = {
 			id,
@@ -113,6 +131,7 @@ export class SessionManager extends EventEmitter implements ISessionManager {
 			terminal,
 			isPrimaryCommand: true,
 			commandConfig,
+			commandType,
 		};
 
 		// Set up persistent background data handler for state detection

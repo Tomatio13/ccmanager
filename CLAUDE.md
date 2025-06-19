@@ -2,11 +2,11 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-# CCManager - Claude Code Worktree Manager
+# CCManager - Claude Code/Codex CLI Worktree Manager
 
 ## Overview
 
-CCManager is a TUI application for managing multiple Claude Code sessions across Git worktrees. It allows you to run Claude Code in parallel across different worktrees, switch between them seamlessly, and manage worktrees directly from the interface.
+CCManager is a TUI application for managing multiple AI coding sessions (Claude Code and Codex) across Git worktrees. It allows you to run AI assistants in parallel across different worktrees, switch between them seamlessly, choose your preferred AI assistant per session, and manage worktrees directly from the interface.
 
 ## Project Structure
 

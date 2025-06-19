@@ -64,16 +64,19 @@ const Menu: React.FC<MenuProps> = ({sessionManager, onSelectWorktree}) => {
 		const menuItems: MenuItem[] = worktrees.map(wt => {
 			const session = sessions.find(s => s.worktreePath === wt.path);
 			let status = '';
+			let commandPrefix = '';
 
 			if (session) {
 				status = ` [${getStatusDisplay(session.state)}]`;
+				// Add command type prefix
+				commandPrefix = session.commandType === 'codex' ? '[X] ' : '[C] ';
 			}
 
 			const branchName = wt.branch.replace('refs/heads/', '');
 			const isMain = wt.isMainWorktree ? ' (main)' : '';
 
 			return {
-				label: `${branchName}${isMain}${status}`,
+				label: `${commandPrefix}${branchName}${isMain}${status}`,
 				value: wt.path,
 				worktree: wt,
 			};
@@ -159,13 +162,13 @@ const Menu: React.FC<MenuProps> = ({sessionManager, onSelectWorktree}) => {
 		<Box flexDirection="column">
 			<Box marginBottom={1}>
 				<Text bold color="green">
-					CCManager - Claude Code Session Manager
+					CCManager - Claude Code/Codex CLI Worktree Manager
 				</Text>
 			</Box>
 
 			<Box marginBottom={1}>
 				<Text dimColor>
-					Select a worktree to start or resume a Claude Code session:
+					Select a worktree to start or resume an AI coding session:
 				</Text>
 			</Box>
 
@@ -177,6 +180,7 @@ const Menu: React.FC<MenuProps> = ({sessionManager, onSelectWorktree}) => {
 					{STATUS_ICONS.WAITING} {STATUS_LABELS.WAITING} {STATUS_ICONS.IDLE}{' '}
 					{STATUS_LABELS.IDLE}
 				</Text>
+				<Text dimColor>Commands: [C] Claude Code, [X] Codex</Text>
 				<Text dimColor>Controls: ↑↓ Navigate Enter Select</Text>
 			</Box>
 		</Box>
