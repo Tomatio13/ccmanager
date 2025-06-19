@@ -6,30 +6,21 @@ import NewWorktree from './NewWorktree.js';
 import DeleteWorktree from './DeleteWorktree.js';
 import MergeWorktree from './MergeWorktree.js';
 import Configuration from './Configuration.js';
-import CommandSelection from './CommandSelection.js';
 import {SessionManager} from '../services/sessionManager.js';
 import {WorktreeService} from '../services/worktreeService.js';
-import {Worktree, Session as SessionType, CommandType} from '../types/index.js';
+import {Worktree, Session as SessionType} from '../types/index.js';
 import {shortcutManager} from '../services/shortcutManager.js';
-import {
-	checkCommandAvailability,
-	getDefaultCommandType,
-	shouldShowCommandSelection,
-	CommandAvailability,
-} from '../utils/commandChecker.js';
 
 type View =
 	| 'menu'
 	| 'session'
-	| 'command-selection'
 	| 'new-worktree'
 	| 'creating-worktree'
 	| 'delete-worktree'
 	| 'deleting-worktree'
 	| 'merge-worktree'
 	| 'merging-worktree'
-	| 'configuration'
-	| 'no-commands-available';
+	| 'configuration';
 
 const App: React.FC = () => {
 	const {exit} = useApp();
@@ -37,24 +28,8 @@ const App: React.FC = () => {
 	const [sessionManager] = useState(() => new SessionManager());
 	const [worktreeService] = useState(() => new WorktreeService());
 	const [activeSession, setActiveSession] = useState<SessionType | null>(null);
-	const [selectedWorktree, setSelectedWorktree] = useState<Worktree | null>(
-		null,
-	);
 	const [error, setError] = useState<string | null>(null);
 	const [menuKey, setMenuKey] = useState(0); // Force menu refresh
-	const [commandAvailability, setCommandAvailability] =
-		useState<CommandAvailability | null>(null);
-
-	useEffect(() => {
-		// Check command availability on startup
-		const availability = checkCommandAvailability();
-		setCommandAvailability(availability);
-
-		// If no commands are available, show error view
-		if (availability.available.length === 0) {
-			setView('no-commands-available');
-		}
-	}, []);
 
 	useEffect(() => {
 		// Listen for session exits to return to menu automatically
@@ -88,7 +63,7 @@ const App: React.FC = () => {
 		};
 	}, [sessionManager]);
 
-	const handleSelectWorktree = (worktree: Worktree) => {
+	const handleSelectWorktree = async (worktree: Worktree) => {
 		// Check if this is the new worktree option
 		if (worktree.path === '') {
 			setView('new-worktree');
@@ -120,36 +95,24 @@ const App: React.FC = () => {
 			return;
 		}
 
-		// Get existing session or create new session based on command availability
+		// Get or create session for this worktree
 		let session = sessionManager.getSession(worktree.path);
 
 		if (!session) {
-			// No existing session, check command availability
-			if (!commandAvailability) return; // Wait for availability check
-
-			if (shouldShowCommandSelection(commandAvailability)) {
-				// Multiple commands available, show selection
-				setSelectedWorktree(worktree);
-				setView('command-selection');
-			} else {
-				// Only one command available, create session directly
-				const defaultCommand = getDefaultCommandType(commandAvailability);
-				if (defaultCommand) {
-					session = sessionManager.createSession(worktree.path, defaultCommand);
-					setActiveSession(session);
-					setView('session');
-				}
+			try {
+				session = await sessionManager.createSession(worktree.path);
+			} catch (error) {
+				setError(`Failed to create session: ${error}`);
+				return;
 			}
-		} else {
-			// Existing session found, open it directly
-			setActiveSession(session);
-			setView('session');
 		}
+
+		setActiveSession(session);
+		setView('session');
 	};
 
 	const handleReturnToMenu = () => {
 		setActiveSession(null);
-		setSelectedWorktree(null);
 		setError(null);
 
 		// Add a small delay to ensure Session cleanup completes
@@ -173,40 +136,20 @@ const App: React.FC = () => {
 		}, 50); // Small delay to ensure proper cleanup
 	};
 
-	const handleCreateWorktree = async (path: string, branch: string) => {
+	const handleCreateWorktree = async (
+		path: string,
+		branch: string,
+		baseBranch: string,
+	) => {
 		setView('creating-worktree');
 		setError(null);
 
 		// Create the worktree
-		const result = worktreeService.createWorktree(path, branch);
+		const result = worktreeService.createWorktree(path, branch, baseBranch);
 
 		if (result.success) {
-			// Success - handle new worktree based on command availability
-			const newWorktree: Worktree = {
-				path: path,
-				branch: `refs/heads/${branch}`,
-				isMainWorktree: false,
-				hasSession: false,
-			};
-
-			if (!commandAvailability) return; // Wait for availability check
-
-			if (shouldShowCommandSelection(commandAvailability)) {
-				// Multiple commands available, show selection
-				setSelectedWorktree(newWorktree);
-				setView('command-selection');
-			} else {
-				// Only one command available, create session directly
-				const defaultCommand = getDefaultCommandType(commandAvailability);
-				if (defaultCommand) {
-					const session = sessionManager.createSession(
-						newWorktree.path,
-						defaultCommand,
-					);
-					setActiveSession(session);
-					setView('session');
-				}
-			}
+			// Success - return to menu
+			handleReturnToMenu();
 		} else {
 			// Show error
 			setError(result.error || 'Failed to create worktree');
@@ -283,23 +226,6 @@ const App: React.FC = () => {
 	};
 
 	const handleCancelMergeWorktree = () => {
-		handleReturnToMenu();
-	};
-
-	const handleCommandSelection = (commandType: CommandType) => {
-		if (!selectedWorktree) return;
-
-		// Create session with selected command type
-		const session = sessionManager.createSession(
-			selectedWorktree.path,
-			commandType,
-		);
-		setActiveSession(session);
-		setSelectedWorktree(null);
-		setView('session');
-	};
-
-	const handleCancelCommandSelection = () => {
 		handleReturnToMenu();
 	};
 
@@ -404,73 +330,8 @@ const App: React.FC = () => {
 		);
 	}
 
-	if (view === 'command-selection' && selectedWorktree && commandAvailability) {
-		return (
-			<CommandSelection
-				worktreeBranch={selectedWorktree.branch.replace('refs/heads/', '')}
-				commandAvailability={commandAvailability}
-				onComplete={handleCommandSelection}
-				onCancel={handleCancelCommandSelection}
-			/>
-		);
-	}
-
 	if (view === 'configuration') {
 		return <Configuration onComplete={handleReturnToMenu} />;
-	}
-
-	if (view === 'no-commands-available') {
-		const NoCommandsView: React.FC = () => {
-			React.useEffect(() => {
-				const handleKeyPress = () => {
-					sessionManager.destroy();
-					exit();
-				};
-
-				process.stdin.on('keypress', handleKeyPress);
-				return () => {
-					process.stdin.off('keypress', handleKeyPress);
-				};
-			}, []);
-
-			return (
-				<Box flexDirection="column">
-					<Box marginBottom={1}>
-						<Text bold color="red">
-							No AI Coding Commands Available
-						</Text>
-					</Box>
-
-					<Box marginBottom={1}>
-						<Text>
-							CCManager requires at least one of the following AI coding
-							commands to be installed:
-						</Text>
-					</Box>
-
-					<Box marginBottom={1} flexDirection="column">
-						<Text>
-							• <Text bold>claude</Text> - Advanced AI coding assistant
-						</Text>
-						<Text>
-							• <Text bold>codex</Text> - Fast AI code completion
-						</Text>
-					</Box>
-
-					<Box marginBottom={1}>
-						<Text>
-							Please install one or both commands and restart CCManager.
-						</Text>
-					</Box>
-
-					<Box marginTop={1}>
-						<Text dimColor>Press any key to exit...</Text>
-					</Box>
-				</Box>
-			);
-		};
-
-		return <NoCommandsView />;
 	}
 
 	return null;
